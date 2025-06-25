@@ -418,3 +418,77 @@
     })
   }
 )
+
+;; Map to track task recommendations
+(define-map task-recommendations
+  principal
+  {
+    recommended-tasks: (list 10 uint),
+    recommendation-reason: (list 10 (string-utf8 100)),
+    recommendation-score: (list 10 uint),
+    last-updated: uint
+  }
+)
+
+;; Map to track automated task execution
+(define-map automated-task-execution
+  {task-id: uint}
+  {
+    execution-conditions: (list 5 {
+      condition-type: uint,  ;; 0=time, 1=event, 2=data
+      condition-data: (buff 32),
+      condition-met: bool,
+      condition-met-at: uint
+    }),
+    execution-hooks: (list 5 {
+      hook-type: uint,  ;; 0=notification, 1=payment, 2=state-change
+      hook-data: (buff 32),
+      hook-executed: bool,
+      hook-executed-at: uint
+    }),
+    validation-rules: (list 5 {
+      rule-type: uint,  ;; 0=hash-match, 1=threshold, 2=consensus
+      rule-data: (buff 32),
+      validation-result: bool,
+      validated-at: uint
+    }),
+    status: uint  ;; 0=pending, 1=executing, 2=validated, 3=failed
+  }
+)
+
+;; Function to set up automated task execution
+(define-public (setup-automated-execution
+  (task-id uint)
+  (execution-conditions (list 5 {
+    condition-type: uint,
+    condition-data: (buff 32),
+    condition-met: bool,
+    condition-met-at: uint
+  }))
+  (validation-rules (list 5 {
+    rule-type: uint,
+    rule-data: (buff 32),
+    validation-result: bool,
+    validated-at: uint
+  }))
+)
+  (let 
+    ((task (unwrap! (map-get? tasks {task-id: task-id}) ERR-TASK-NOT-FOUND)))
+    
+    ;; Verify caller is task creator
+    (asserts! (is-eq tx-sender (get creator task)) ERR-UNAUTHORIZED)
+    
+    ;; Set up automation
+    (map-set automated-task-execution
+      {task-id: task-id}
+      {
+        execution-conditions: execution-conditions,
+        execution-hooks: (list),
+        validation-rules: validation-rules,
+        status: u0
+      }
+    )
+    
+    (ok true)
+  )
+)
